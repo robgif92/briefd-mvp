@@ -3,7 +3,7 @@ import fs from 'fs';
 import { generateNewsletter } from '@/lib/generateNewsletter';
 import { sendEmail } from '@/lib/sendEmail';
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export interface UserPreferences {
     firstName: string;
@@ -29,27 +29,41 @@ export async function POST(request: Request) {
         let cadence = "Weekly";
 
         for (const field of fields) {
+            let val = field.value;
+
+            // Resolve ID values to text labels for Multiple Choice fields
+            if (field.type === 'MULTIPLE_CHOICE' && Array.isArray(val) && field.options) {
+                val = val.map((id: string) => {
+                    const option = field.options.find((opt: any) => opt.id === id);
+                    return option ? option.text : id;
+                });
+            }
+
             if (field.label === "First Name") {
-                firstName = field.value || firstName;
+                firstName = (Array.isArray(val) ? val[0] : val) || firstName;
             }
             if (field.label === "Email") {
-                email = field.value || email;
+                email = (Array.isArray(val) ? val[0] : val) || email;
             }
             if (field.label === "Topics") {
-                topics = field.value || topics;
+                // Remove emojis and extra whitespace to match prompt logic
+                topics = Array.isArray(val)
+                    ? val.map((s: string) => s.replace(/[^\w\s&]/g, '').trim())
+                    : [val];
             }
             if (field.label === "Location") {
-                location = field.value || location;
+                location = (Array.isArray(val) ? val[0] : val) || location;
             }
             if (field.label === "Sport Team") {
-                sportTeam = field.value || sportTeam;
+                sportTeam = (Array.isArray(val) ? val[0] : val) || sportTeam;
             }
             if (field.label === "Cadence") {
-                cadence = field.value || cadence;
+                cadence = (Array.isArray(val) ? val[0] : val) || cadence;
             }
         }
 
         if (!email) {
+            console.error('No email found in payload. Processed fields:', { firstName, email, topics, location });
             return NextResponse.json({ error: "Email is required" }, { status: 400 });
         }
 
@@ -61,6 +75,8 @@ export async function POST(request: Request) {
             sportTeam,
             cadence
         };
+
+        console.log('Final Preferences Object:', JSON.stringify(preferences, null, 2));
 
         // Generate Newsletter based on user preferences
         const newsletterHtml = await generateNewsletter(preferences);
