@@ -3,7 +3,7 @@ import fs from 'fs';
 import { generateNewsletter } from '@/lib/generateNewsletter';
 import { sendEmail } from '@/lib/sendEmail';
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export interface UserPreferences {
     firstName: string;
