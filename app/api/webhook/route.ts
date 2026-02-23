@@ -29,22 +29,22 @@ export async function POST(request: Request) {
         let cadence = "Weekly";
 
         for (const field of fields) {
-            if (field.label === "First, what's your first name?") {
+            if (field.label === "First Name") {
                 firstName = field.value || firstName;
             }
-            if (field.label === "And your email address?") {
+            if (field.label === "Email") {
                 email = field.value || email;
             }
-            if (field.label === "What do you want your Briefd to cover?") {
+            if (field.label === "Topics") {
                 topics = field.value || topics;
             }
-            if (field.label === "Where are you based?") {
+            if (field.label === "Location") {
                 location = field.value || location;
             }
-            if (field.label === "Which sport team do you follow?") {
+            if (field.label === "Sport Team") {
                 sportTeam = field.value || sportTeam;
             }
-            if (field.label === "How often do you want your Briefd?") {
+            if (field.label === "Cadence") {
                 cadence = field.value || cadence;
             }
         }
