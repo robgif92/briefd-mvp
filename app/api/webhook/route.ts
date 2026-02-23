@@ -17,6 +17,7 @@ export interface UserPreferences {
 export async function POST(request: Request) {
     try {
         const payload = await request.json();
+        console.log('Incoming Tally Payload:', JSON.stringify(payload, null, 2));
         const fields = payload?.data?.fields || [];
 
         // Parse Tally.so fields with defaults
