@@ -6,8 +6,7 @@ const mockPreferences: UserPreferences = {
     email: "robgif1@gmail.com",
     topics: ["Global Headlines", "Finance & Markets", "AI & Tech", "Sport"],
     location: "New York",
-    sportTeam: "Arsenal",
-    cadence: "Weekly"
+    sportTeam: "Arsenal"
 };
 
 async function test() {

@@ -1,9 +1,8 @@
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { UserPreferences } from '../app/api/webhook/route';
 
-const client = new OpenAI({
-    apiKey: process.env.PERPLEXITY_API_KEY,
-    baseURL: 'https://api.perplexity.ai',
+const client = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 export function getPrompt(preferences: UserPreferences): { system: string, user: string } {
@@ -116,23 +115,40 @@ export async function generateNewsletter(preferences: UserPreferences): Promise<
     try {
         const { system, user } = getPrompt(preferences);
 
-        const response = await client.chat.completions.create({
-            model: "sonar",
-            messages: [
-                { role: "system", content: system },
-                { role: "user", content: user }
+        const message = await client.messages.create({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 12000,
+            tools: [
+                {
+                    type: "web_search_20250305",
+                    name: "web_search"
+                }
             ],
-            temperature: 0.2,
+            system: system,
+            messages: [
+                {
+                    role: "user",
+                    content: user
+                }
+            ]
+        }, {
+            headers: {
+                "anthropic-beta": "web-search-2025-03-05"
+            }
         });
 
-        const fullText = response.choices[0].message.content || '';
-        if (fullText) {
+        // Extract the final text response
+        const textBlocks = message.content.filter((block: any) => block.type === 'text');
+        if (textBlocks.length > 0) {
+            const fullText = textBlocks
+                .map((block: any) => block.type === 'text' ? block.text : '')
+                .join('');
             return fullText;
         }
-        throw new Error('No text response from Perplexity');
+        throw new Error('No text response from Claude');
 
     } catch (error: any) {
-        console.error('Generation error:', error);
+        console.error('Claude Generation error:', error);
         throw error;
     }
 }

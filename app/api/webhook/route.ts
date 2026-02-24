@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
 import { generateNewsletter } from '@/lib/generateNewsletter';
 import { sendEmail } from '@/lib/sendEmail';
+import { supabase } from '@/lib/supabase';
 
 export const maxDuration = 300;
 
@@ -11,7 +11,6 @@ export interface UserPreferences {
     topics: string[];
     location: string;
     sportTeam: string;
-    cadence: string;
 }
 
 export async function POST(request: Request) {
@@ -26,7 +25,6 @@ export async function POST(request: Request) {
         let topics = ["Global Headlines"];
         let location = "your city";
         let sportTeam = "none";
-        let cadence = "Weekly";
 
         for (const field of fields) {
             let val = field.value;
@@ -57,9 +55,6 @@ export async function POST(request: Request) {
             if (field.label === "Sport Team") {
                 sportTeam = (Array.isArray(val) ? val[0] : val) || sportTeam;
             }
-            if (field.label === "Cadence") {
-                cadence = (Array.isArray(val) ? val[0] : val) || cadence;
-            }
         }
 
         if (!email) {
@@ -72,32 +67,51 @@ export async function POST(request: Request) {
             email,
             topics,
             location,
-            sportTeam,
-            cadence
+            sportTeam
         };
 
         console.log('Final Preferences Object:', JSON.stringify(preferences, null, 2));
 
-        // Generate Newsletter based on user preferences
-        const newsletterHtml = await generateNewsletter(preferences);
+        // 1. Save to Database (Upsert based on email)
+        const { data: existingUser, error: fetchError } = await supabase
+            .from('subscriptions')
+            .select('last_sent')
+            .eq('email', email)
+            .single();
 
-        // Preview Check
-        const previewField = fields.find((f: any) => f.label === 'preview');
-        const isPreview = previewField?.value === 'true';
-
-        if (isPreview) {
-            fs.writeFileSync('./preview.html', newsletterHtml);
-            return NextResponse.json({
-                success: true,
-                mode: 'preview',
-                message: 'preview.html saved — open it in your browser'
+        const { error: upsertError } = await supabase
+            .from('subscriptions')
+            .upsert({
+                email,
+                first_name: firstName,
+                topics,
+                location,
+                sport_team: sportTeam,
+                updated_at: new Date().toISOString()
             });
+
+        if (upsertError) throw upsertError;
+
+        // 2. Decide if we send an immediate "Welcome" email
+        // We send it if the user is new OR if they've never been sent one
+        const shouldSendWelcome = !existingUser || !existingUser.last_sent;
+
+        if (shouldSendWelcome) {
+            console.log(`New subscriber detected (${email}). Generating immediate welcome newsletter...`);
+
+            const newsletterHtml = await generateNewsletter(preferences);
+            await sendEmail(email, firstName, newsletterHtml);
+
+            // Update last_sent timestamp
+            await supabase
+                .from('subscriptions')
+                .update({ last_sent: new Date().toISOString() })
+                .eq('email', email);
+
+            return NextResponse.json({ success: true, message: 'Welcome email sent and user subscribed' });
         }
 
-        // Send the Email
-        await sendEmail(email, firstName, newsletterHtml);
-
-        return NextResponse.json({ success: true, mode: 'sent' });
+        return NextResponse.json({ success: true, message: 'Subscription updated' });
 
     } catch (error: any) {
         console.error('Webhook error:', error);
