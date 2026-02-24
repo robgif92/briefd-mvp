@@ -1,11 +1,9 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { UserPreferences } from '../app/api/webhook/route';
 
-const client = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-    defaultHeaders: {
-        "anthropic-beta": "web-search-2025-03-05"
-    }
+const client = new OpenAI({
+    apiKey: process.env.PERPLEXITY_API_KEY,
+    baseURL: 'https://api.perplexity.ai',
 });
 
 export function getPrompt(preferences: UserPreferences): { system: string, user: string } {
@@ -118,34 +116,23 @@ export async function generateNewsletter(preferences: UserPreferences): Promise<
     try {
         const { system, user } = getPrompt(preferences);
 
-        const message = await client.messages.create({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 12000,
-            tools: [
-                {
-                    type: "web_search_20250305",
-                    name: "web_search"
-                }
+        const response = await client.chat.completions.create({
+            model: "sonar",
+            messages: [
+                { role: "system", content: system },
+                { role: "user", content: user }
             ],
-            system: system,
-            messages: [{
-                role: 'user',
-                content: user
-            }]
+            temperature: 0.2,
         });
 
-        const textBlocks = message.content.filter(block => block.type === 'text');
-        if (textBlocks.length > 0) {
-            const fullText = textBlocks
-                .map(block => block.type === 'text' ? block.text : '')
-                .join('')
-            return fullText
+        const fullText = response.choices[0].message.content || '';
+        if (fullText) {
+            return fullText;
         }
+        throw new Error('No text response from Perplexity');
 
-        throw new Error('No text response from Claude');
-
-    } catch (error) {
-        console.error('Claude API error:', error);
+    } catch (error: any) {
+        console.error('Generation error:', error);
         throw error;
     }
 }
